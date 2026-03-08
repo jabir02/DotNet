@@ -1,0 +1,93 @@
+@page "/fetchproducts"
+@using System.Text.Json
+@inject HttpClient HttpClient
+
+<h3>InventoryHub Product List</h3>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        <strong>Error:</strong> @errorMessage
+    </div>
+}
+else if (products == null)
+{
+    <p><em>Loading products from database...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in products)
+            {
+                <tr>
+                    <td>@product.Name</td>
+                    <td>@product.Category?.Name</td>
+                    <td>$@product.Price.ToString("0.00")</td>
+                    <td>@product.Stock units</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Product[]? products;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Activity 4 Optimization: Prevent redundant API calls if data is already loaded in memory
+        if (products != null) return;
+
+        try
+        {
+            // Activity 2: Updated to the correct route (/api/productlist)
+            // UPDATE THE PORT NUMBER BELOW TO MATCH YOUR SERVERAPP TERMINAL OUTPUT
+            var response = await HttpClient.GetAsync("http://localhost:5122/api/productlist");
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync();
+            
+            // Activity 2: Safely deserialize JSON, ignoring case sensitivity differences
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            products = JsonSerializer.Deserialize<Product[]>(json, options);
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Network error (Please verify the server is running and CORS is enabled). Details: {ex.Message}";
+        }
+        catch (JsonException ex)
+        {
+            errorMessage = $"Malformed JSON data received from the server. Details: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+        }
+    }
+
+    // Activity 3: Updated C# Models to match the nested JSON structure
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public double Price { get; set; }
+        public int Stock { get; set; }
+        public Category? Category { get; set; } // Nested object
+    }
+
+    public class Category
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+}
